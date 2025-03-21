@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <cuda_runtime.h>
+
+// Definir o número de elementos
+#define N 10000000
+
+// Kernel CUDA para multiplicar cada elemento do vetor por um escalar
+__global__ void multiply_by_scalar(float *a, float scalar, int n) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx < n) {
+        a[idx] = a[idx] * scalar;
+    }
+}
+
+int main() {
+    float *a_cpu, *a_gpu;
+    float scalar = 5.0f;
+    size_t size = N * sizeof(float);
+
+    // Alocar memória para o vetor na CPU
+    a_cpu = (float *)malloc(size);
+    if (a_cpu == NULL) {
+        printf("Falha ao alocar memória na CPU!\n");
+        return -1;
+    }
+
+    // Inicializar o vetor com valores aleatórios
+    for (int i = 0; i < N; i++) {
+        a_cpu[i] = (float)rand() / RAND_MAX;
+    }
+
+    // Alocar memória para o vetor na GPU
+    cudaMalloc((void **)&a_gpu, size);
+
+    // Copiar os dados da CPU para a GPU
+    cudaMemcpy(a_gpu, a_cpu, size, cudaMemcpyHostToDevice);
+
+    // Definir o número de threads por bloco e o número de blocos
+    int block_size = 1024;
+    int grid_size = (N + block_size - 1) / block_size;
+
+    // Lançar o kernel CUDA
+    multiply_by_scalar<<<grid_size, block_size>>>(a_gpu, scalar, N);
+
+    // Esperar a execução do kernel
+    cudaDeviceSynchronize();
+
+    // Copiar o resultado de volta da GPU para a CPU
+    cudaMemcpy(a_cpu, a_gpu, size, cudaMemcpyDeviceToHost);
+
+    // Exibir os primeiros 5 valores do vetor resultante
+    printf("Primeiros 5 valores do vetor resultante:\n");
+    for (int i = 0; i < 5; i++) {
+        printf("%f\n", a_cpu[i]);
+    }
+
+    // Liberar a memória alocada
+    cudaFree(a_gpu);
+    free(a_cpu);
+
+    // Finalizar a execução
+    cudaDeviceReset();
+    return 0;
+}
